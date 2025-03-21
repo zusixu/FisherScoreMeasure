@@ -1,7 +1,14 @@
 import numpy as np
+from scipy.optimize import root_scalar
 
 
-def fisher_score(X, y):
+def calculate_fisher_score(X, y):
+    """
+    计算各个特征的 Fisher Score
+    :param X: 特征矩阵, shape (n_samples, n_features)
+    :param y: 标签向量, shape (n_samples,)
+    :return: Fisher Score 向量, shape (n_features,)
+    """
     classes = np.unique(y)
     n_features = X.shape[1]
     overall_mean = np.mean(X, axis=0)
@@ -27,21 +34,12 @@ def fisher_score(X, y):
         fisher_scores[i] = between_class / denominator if denominator != 0 else 0
 
     # 使用 Sigmoid 函数进行归一化
-    fisher_scores = 1 / (1 + np.exp(-fisher_scores))
-
+    minnum = np.min(fisher_scores)
+    maxnum = np.max(fisher_scores)
+    z = (fisher_scores - minnum) / (maxnum - minnum)*2-1
+    fisher_scores = 1 / (1 + np.exp(-z))
     return fisher_scores
 
-
-def calculate_fisher_score(X, y):
-    """
-    计算各个特征的 Fisher Score
-    :param X: 特征矩阵, shape (n_samples, n_features)
-    :param y: 标签向量, shape (n_samples,)
-    :return: Fisher Score 向量, shape (n_features,)
-    """
-    # 使用 sklearn 的 fisher_score 函数计算 Fisher Score
-    scores = fisher_score(X, y)
-    return scores
 
 def get_data_and_calculate_fisher_score(data, labels):
     """
@@ -53,11 +51,12 @@ def get_data_and_calculate_fisher_score(data, labels):
     # 确保输入数据为 numpy 数组
     X = np.array(data)
     y = np.array(labels)
-    
+
     # 计算 Fisher Score
     fisher_scores = calculate_fisher_score(X, y)
-    
+
     return fisher_scores
+
 
 def calculate_combined_fisher_score(fs_A, fs_B, lambda_value):
     """
@@ -70,6 +69,37 @@ def calculate_combined_fisher_score(fs_A, fs_B, lambda_value):
     return fs_A + fs_B + lambda_value * fs_A * fs_B
 
 
+# def solve_lambda(fs_list):
+#     fs_list = list(fs_list)
+#     if not fs_list:
+#         print("Error: Empty input list.")
+#         return 0.0  # 处理空列表情况
+#
+#     def equation(lambda_):
+#         product = 1.0
+#         for fs in fs_list:
+#             product *= 1 + lambda_ * fs
+#         return 1 + lambda_ - product
+#
+#     # 检查是否存在非零解
+#     try:
+#         # 尝试在负区间寻找解
+#         sol_neg = root_scalar(equation, bracket=[-1.0, 0.0], method='brentq')
+#         if sol_neg.converged and abs(sol_neg.root) > 1e-8:
+#             return sol_neg.root
+#     except ValueError:
+#         pass
+#
+#     try:
+#         # 尝试在正区间寻找解
+#         sol_pos = root_scalar(equation, bracket=[0.0, 1.0], method='brentq')
+#         if sol_pos.converged and abs(sol_pos.root) > 1e-8:
+#             return sol_pos.root
+#     except ValueError:
+#         pass
+#
+#     # 若未找到非零解，返回0.0
+#     return 0.0
 def solve_lambda(fs_values, lambda_init=-0.1, max_iter=100, tol=1e-6):
     """
     使用牛顿迭代法求解方程 1 + λ = Π(1 + λ*fs_i)
@@ -108,35 +138,38 @@ def solve_lambda(fs_values, lambda_init=-0.1, max_iter=100, tol=1e-6):
         lambda_est -= f / df
 
     return lambda_est
+
+
 def test_combined_fisher_score():
     """
     测试特征组合的 Fisher Score 计算
     """
     # 模拟数据
     X = np.array([
-        [1, 2, 3],
-        [4, 1, 6],
-        [1, 4, 2],
-        [2, 1, 4],
-        [1, 6, 1]
+        [1, 3,3],
+        [4, 6,5],
+        [1, 2,2],
+        [2, 4,6],
+        [1, 2, 1]
     ])
     y = np.array([0, 1, 0, 0, 1])
 
     # 计算各个特征的 Fisher Score
     fisher_scores = calculate_fisher_score(X, y)
-    
+
     # 求解参数 lambda
     lambda_value = solve_lambda(fisher_scores)
-    
+
     # 计算特征组合的 Fisher Score
     fs_A = fisher_scores[0]
     fs_B = fisher_scores[1]
     combined_fs = calculate_combined_fisher_score(fs_A, fs_B, lambda_value)
-    
+
     # 输出结果
     print("Fisher Scores for individual features:", fisher_scores)
     print("Lambda value:", lambda_value)
     print("Combined Fisher Score for feature 0 and 1:", combined_fs)
+
 
 # 运行测试用例
 test_combined_fisher_score()
